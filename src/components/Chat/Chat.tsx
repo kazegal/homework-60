@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import "../../App.css"
+import "../../App.css";
 
-interface Message {
+interface MessageInterface {
     _id: string;
     message: string;
     author: string;
@@ -9,47 +9,42 @@ interface Message {
 }
 
 const Chat: React.FC = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [messages, setMessages] = useState<MessageInterface[]>([]);
+    const [lastDataMessage, setLastDataMessage] = useState<string | undefined>(undefined);
 
     useEffect(() => {
-        fetchMessages().catch(error => console.error(error));
-    }, []);
+        const interval = setInterval(async () => {
+            try {
+                const newMessages = await fetch(`http://146.185.154.90:8000/messages?datetime=${encodeURIComponent(lastDataMessage || '')}`);
 
-    useEffect(() => {
-        setInterval(async ()=>{
-            fetchMessages().catch(error => console.error(error));
-        }, 3000)
-    }, []);
+                if (newMessages.ok) {
+                    const listMessages = await newMessages.json() as MessageInterface[];
+                    if (listMessages.length > 0) {
+                        setMessages(prevState => [...listMessages, ...prevState]);
+                        const lastMessage = listMessages[listMessages.length - 1];
+                        setLastDataMessage(lastMessage.datetime);
+                    }
+                } else {
+                    console.error('Ошибка получения нового сообщения');
+                }
+            } catch (e) {
+                console.error('Ошибка получения нового сообщения', e);
+            }
+        }, 3000);
 
-
-    const fetchMessages = async () => {
-        setLoading(true);
-        const url = 'http://146.185.154.90:8000/messages';
-            const response = await fetch(url);
-            const responseData = await response.json();
-            responseData.reverse();
-            setMessages(responseData);
-        setLoading(false);
-    };
-
-
+        return () => clearInterval(interval);
+    }, [lastDataMessage]);
 
     return (
         <div className="card m-5 p-2">
             <h4 className="text-center">Chat</h4>
-            {loading ? (
-                <div id="preloader">
-                    <div className="loader">Loading...</div>
+            {messages.map(message => (
+                <div className="card p-2 m-4 text-bg-info" key={message._id}>
+                    <p className="fw-bold">{message.author}:</p>
+                    <p>{message.message}</p>
+                    <span className="text-danger ms-auto">{message.datetime}</span>
                 </div>
-            ) : (
-                messages.map(message => (
-                    <div className="card p-2 m-4 text-bg-info" key={message._id}>
-                        <p className="fw-bold">{message.author}:</p> <p>{message.message}</p>
-                        <span className="text-danger ms-auto">{message.datetime}</span>
-                    </div>
-                ))
-            )}
+            ))}
         </div>
     );
 };
